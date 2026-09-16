@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Facebook Pipeline — Internship Project</title>
+<meta name="description" content="A Graph API pipeline that pulls Facebook Page posts — media, engagement, and reactions — for broadcast/multimedia analytics.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#1b1b17;
+    --paper:#ece6d8;
+    --paper-raised:#f4efe4;
+    --signal:#a83a2c;
+    --wire:#2f6e62;
+    --rule:#c3b9a2;
+    --muted:#6b6355;
+    --max:700px;
+  }
+  *{box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{
+    margin:0;background:var(--paper);color:var(--ink);
+    font-family:"Newsreader", Georgia, serif;font-size:18px;line-height:1.6;
+    -webkit-font-smoothing:antialiased;
+  }
+  a{color:var(--signal);text-decoration-thickness:1px;text-underline-offset:3px;}
+  a:hover{color:var(--wire);}
+  a:focus-visible, button:focus-visible{outline:2px solid var(--wire);outline-offset:3px;}
+  .mono{font-family:"IBM Plex Mono", ui-monospace, monospace;letter-spacing:0.02em;}
+  .wrap{max-width:var(--max);margin:0 auto;padding:0 24px;}
+
+  header.masthead{background:var(--ink);color:var(--paper);padding:56px 0 40px;}
+  header.masthead .wrap{border-top:2px solid var(--paper);padding-top:22px;}
+  .dateline{font-size:13px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;color:#b8ae96;margin-bottom:26px;}
+  .dateline .deadline{color:#e0a08f;}
+  h1.title{font-size:clamp(32px,5vw,50px);font-weight:500;line-height:1.12;margin:0 0 18px;}
+  .subhead{font-size:19px;color:#d8d0bd;font-style:italic;max-width:56ch;margin:0 0 28px;}
+  .byline{font-size:14px;color:#b8ae96;border-top:1px solid #423f36;padding-top:16px;display:flex;gap:28px;flex-wrap:wrap;}
+  .byline strong{color:var(--paper);font-weight:600;}
+
+  main{padding:52px 0 80px;}
+  section{margin-bottom:64px;}
+  section + section{border-top:1px solid var(--rule);padding-top:52px;}
+  .kicker{font-size:13px;color:var(--wire);margin:0 0 10px;font-weight:500;}
+  .kicker::before{content:"§ ";}
+  h2{font-size:28px;font-weight:500;margin:0 0 20px;line-height:1.25;}
+  h3{font-size:20px;font-weight:600;margin:32px 0 10px;}
+  p{margin:0 0 18px;}
+
+  .placeholder{
+    display:block;border:1px dashed #9a8f76;background:var(--paper-raised);
+    padding:14px 16px;font-style:italic;color:var(--muted);border-radius:2px;margin:0 0 18px;
+  }
+  .placeholder .tag{
+    font-family:"IBM Plex Mono", monospace;font-style:normal;font-size:11px;
+    color:var(--signal);display:block;margin-bottom:6px;letter-spacing:0.04em;
+  }
+
+  .video-frame{position:relative;width:100%;padding-top:56.25%;background:var(--ink);border:6px solid var(--ink);}
+  .video-frame iframe{position:absolute;top:0;left:0;width:100%;height:100%;border:0;}
+  .video-caption{font-family:"IBM Plex Mono", monospace;font-size:12px;color:var(--muted);margin-top:10px;}
+
+  .link-row{display:flex;gap:14px;flex-wrap:wrap;margin:0 0 18px;}
+  .link-row a{
+    font-family:"IBM Plex Mono", monospace;font-size:13px;border:1px solid var(--ink);
+    padding:8px 14px;border-radius:2px;text-decoration:none;color:var(--ink);
+  }
+  .link-row a:hover{background:var(--ink);color:var(--paper);}
+
+  /* Pipeline (two phases) */
+  .phase-label{
+    font-family:"IBM Plex Mono", monospace;font-size:13px;color:var(--wire);
+    margin:0 0 14px;font-weight:600;
+  }
+  .pipeline{list-style:none;margin:0 0 36px;padding:0;border-left:2px solid var(--rule);}
+  .pipeline li{position:relative;padding:2px 0 28px 30px;}
+  .pipeline li::before{
+    content:attr(data-n);position:absolute;left:-15px;top:0;width:28px;height:28px;
+    background:var(--paper);border:2px solid var(--wire);color:var(--wire);border-radius:50%;
+    font-family:"IBM Plex Mono", monospace;font-size:11px;font-weight:600;
+    display:flex;align-items:center;justify-content:center;
+  }
+  .pipeline li:last-child{padding-bottom:0;}
+  .pipeline h4{margin:0 0 4px;font-size:17px;font-weight:600;}
+  .pipeline p{margin:0 0 4px;font-size:16px;color:var(--muted);}
+  .pipeline .note{
+    font-family:"IBM Plex Mono", monospace;font-size:12.5px;color:var(--signal);
+    margin:6px 0 0;
+  }
+
+  pre.code{
+    background:var(--ink);color:#e9e2cf;padding:20px;overflow-x:auto;
+    font-family:"IBM Plex Mono", monospace;font-size:13px;line-height:1.55;
+    border-radius:3px;margin:0 0 18px;
+  }
+
+  table.errors{
+    width:100%;border-collapse:collapse;font-family:"IBM Plex Mono", monospace;
+    font-size:13.5px;margin:0 0 24px;
+  }
+  table.errors caption{
+    text-align:left;font-size:11px;color:var(--wire);margin-bottom:8px;letter-spacing:0.04em;
+    caption-side:top;
+  }
+  table.errors th, table.errors td{
+    border-bottom:1px solid var(--rule);padding:9px 10px;text-align:left;vertical-align:top;
+  }
+  table.errors th{color:var(--muted);font-weight:600;font-size:12px;}
+
+  .credits{display:flex;gap:40px;flex-wrap:wrap;}
+  .credit dt{font-family:"IBM Plex Mono", monospace;font-size:12px;color:var(--wire);margin-bottom:4px;}
+  .credit dd{margin:0;font-size:19px;}
+
+  footer{
+    background:var(--ink);color:#8f8874;font-family:"IBM Plex Mono", monospace;
+    font-size:12px;padding:28px 0;text-align:center;
+  }
+  footer a{color:#c3bca6;}
+
+  @media (max-width:600px){ body{font-size:16.5px;} .credits{gap:24px;} }
+  @media (prefers-reduced-motion: reduce){ html{scroll-behavior:auto;} }
+</style>
+</head>
+<body>
+
+<header class="masthead">
+  <div class="wrap">
+    <div class="dateline mono">
+      <span>INTERNSHIP PROJECT — TECHNICAL REPORT</span>
+      <span class="deadline">SUBMITTED 15 SEPT 2026</span>
+    </div>
+    <h1 class="title">Facebook Pipeline</h1>
+    <p class="subhead">Pulling Facebook Page posts through the Graph API — media, engagement, and reaction breakdowns — for broadcast and multimedia analytics.</p>
+    <div class="byline">
+      <span><strong>Author</strong> — <span>Your Name</span></span>
+      <span><strong>Mentor</strong> — Amaan Irfan</span>
+      <span><strong>Faculty Advisor</strong> — Prof. Prithwijit Guha</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <!-- 1. INTRODUCTION -->
+  <section id="introduction">
+    <p class="kicker">Introduction</p>
+    <h2>What this project does</h2>
+    <p>
+      This pipeline connects to a Facebook Page through the Graph API and pulls its posts — including the media attached to each one (photo, video, album, or link), the reaction breakdown across all six reaction types, comment and share counts — so the data can be used for downstream broadcast and multimedia analytics. It mirrors the structure of the existing Twitter pipeline (<code class="mono">config.py</code> / <code class="mono">twitter_client.py</code>), with a Facebook-specific client (<code class="mono">facebook_client.py</code>) built on the same credential-loading pattern.
+    </p>
+
+    <h3>Video walkthrough</h3>
+    <div class="video-frame">
+      <iframe
+        src="https://www.youtube.com/embed/REPLACE_WITH_VIDEO_ID"
+        title="Project walkthrough video"
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+        allowfullscreen>
+      </iframe>
+    </div>
+    <p class="video-caption mono">
+      REPLACE the src above — YouTube: paste the video ID into ".../embed/VIDEO_ID". Vimeo: use "https://player.vimeo.com/video/VIDEO_ID" instead.
+    </p>
+    <p class="placeholder">
+      <span class="tag">REPLACE — what the video covers</span>
+      Walk through: the Meta App / token setup, the Graph API request and fields, pagination, the raw-save stage, error handling by error code, and the flatten-to-SQLite step.
+    </p>
+
+    <div class="link-row">
+      <a href="https://github.com/luvyarana/facebook-pipeline">Project repository ↗</a>
+    </div>
+  </section>
+
+  <!-- 2. ARCHITECTURE -->
+  <section id="architecture">
+    <p class="kicker">Architecture</p>
+    <h2>How a post moves through the pipeline</h2>
+    <p>
+      Two stages: getting credentialed access to a Page, and the client pipeline that pulls, saves, and normalizes its posts.
+    </p>
+
+    <p class="phase-label">PHASE A — CREDENTIALS &amp; ACCESS</p>
+    <ol class="pipeline">
+      <li data-n="1"><h4>Test Page</h4><p>Created a Facebook Page to administer, and posted sample content (text, image, link) so the pipeline has real data to pull once working.</p></li>
+      <li data-n="2"><h4>Meta for Developers account</h4><p>Registered at developers.facebook.com using the existing test Facebook account.</p></li>
+      <li data-n="3"><h4>Meta App</h4><p>Created via My Apps → Create App, use case "Other", type "Business" — generates the App ID and App Secret.</p></li>
+      <li data-n="4"><h4>Development Mode</h4><p>Left in Development Mode rather than submitted for App Review — any user with a role on the app can generate tokens and pull data immediately.</p></li>
+      <li data-n="5"><h4>User Access Token</h4><p>Generated in Graph API Explorer with <code class="mono">pages_show_list</code>, <code class="mono">pages_read_engagement</code>, <code class="mono">pages_read_user_content</code> permissions.</p></li>
+      <li data-n="6"><h4>Long-lived Page Access Token</h4><p>Short-lived User token (~1–2 hrs) exchanged via the Access Token Debugger / <code class="mono">/oauth/access_token</code> (<code class="mono">grant_type=fb_exchange_token</code>) into a ~60-day token, then <code class="mono">/me/accounts</code> returns the Page Access Token the pipeline actually uses.</p></li>
+      <li data-n="7"><h4>Verified with one real request</h4><p><code class="mono">GET /{page-id}/posts?fields=message,created_time,likes.summary(true),comments.summary(true),shares</code> in Graph API Explorer, confirming real JSON came back before writing any client code.</p></li>
+      <li data-n="8"><h4>Credentials saved</h4><p><code class="mono">FACEBOOK_APP_ID</code>, <code class="mono">FACEBOOK_APP_SECRET</code>, <code class="mono">FACEBOOK_PAGE_ID</code>, <code class="mono">FACEBOOK_PAGE_ACCESS_TOKEN</code> in <code class="mono">.env</code>, loaded the same way <code class="mono">twitter_client.py</code> loads <code class="mono">TWITTER_API_KEY</code>.</p></li>
+    </ol>
+
+    <p class="phase-label">PHASE B — CLIENT PIPELINE</p>
+    <ol class="pipeline">
+      <li data-n="1">
+        <h4>API version + token check</h4>
+        <p>Bumped the expired <code class="mono">v18.0</code> endpoint to a current stable version, and check the Page Access Token hasn't expired (Access Token Debugger) before assuming a failure is version-related.</p>
+      </li>
+      <li data-n="2">
+        <h4>Expand requested fields</h4>
+        <p>Moved beyond <code class="mono">id,message,created_time</code> to include <code class="mono">attachments</code> (media type/URL — the multimedia classification signal), six aliased <code class="mono">reactions.type(X)</code> calls for the full reaction breakdown, and <code class="mono">likes.summary(true)</code> for a cheap total count.</p>
+        <p class="note">shares only appears in the response when a post has ≥1 share — parsed as <code class="mono">post.get("shares", {}).get("count", 0)</code>, not a direct key lookup.</p>
+      </li>
+      <li data-n="3">
+        <h4>Pagination</h4>
+        <p>Follow <code class="mono">paging.next</code> until it disappears; once following it, don't re-pass params (the URL already encodes them). <code class="mono">limit=100</code> is the practical max Facebook honors per request.</p>
+      </li>
+      <li data-n="4">
+        <h4>Raw-save stage</h4>
+        <p>Every unmodified API response now lands on disk before any transform — the source of truth for reprocessing without re-hitting a rate-limited API, and a hedge against Meta renaming fields later.</p>
+      </li>
+      <li data-n="5">
+        <h4>Error handling by Facebook error code</h4>
+        <p>Split from one generic <code class="mono">RuntimeError</code> into code-specific handling (table below), so the pipeline can tell "wait and retry" from "stop and alert" from "fix the config."</p>
+      </li>
+      <li data-n="6">
+        <h4>Multiple Pages + scheduling</h4>
+        <p>Page IDs moved out of a hardcoded <code class="mono">.env</code> entry into <code class="mono">pages.txt</code> (one ID per line), looped over. Scheduling is a simple interval loop — no job scheduler needed at this scale.</p>
+        <p class="note">One Page Access Token only works for Pages you administer — a pages.txt entry you don't admin fails with 190/permission, which is a platform limit, not a bug to fix.</p>
+      </li>
+      <li data-n="7">
+        <h4>Downstream: flatten + store</h4>
+        <p>Each raw post dict is normalized into a row — <code class="mono">post_id, page_id, message, created_time, media_type, media_url</code>, the six reaction counts, <code class="mono">comment_count, share_count</code> — and ingested into SQLite for querying.</p>
+      </li>
+    </ol>
+
+    <h3>Error-code routing</h3>
+    <table class="errors">
+      <caption>FACEBOOK GRAPH API ERROR CODES → PIPELINE RESPONSE</caption>
+      <thead>
+        <tr><th>Code</th><th>Meaning</th><th>Response</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>190</td><td>Access token expired or invalid</td><td>Stop the run, alert — a fresh token is needed, not a retry</td></tr>
+        <tr><td>4, 17</td><td>App / user rate limit hit</td><td>Back off and retry later</td></tr>
+        <tr><td>10, 200, 294</td><td>Missing permission / unscoped field</td><td>Config problem — fix the field list</td></tr>
+        <tr><td>100</td><td>Invalid parameter (malformed field string)</td><td>Request bug — will never succeed on retry</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Core logic — parsing a field Facebook may omit</h3>
+    <pre class="code"><code>share_count = post.get("shares", {}).get("count", 0)
+# shares is left out of the response entirely when a post has 0 shares —
+# a direct post["shares"]["count"] raises KeyError on those posts.</code></pre>
+  </section>
+
+  <!-- CREDITS -->
+  <section id="credits">
+    <p class="kicker">Credits</p>
+    <h2>Guided by</h2>
+    <dl class="credits">
+      <div class="credit"><dt>MENTOR</dt><dd>Amaan Irfan</dd></div>
+      <div class="credit"><dt>FACULTY ADVISOR</dt><dd>Prof. Prithwijit Guha</dd></div>
+    </dl>
+  </section>
+
+</main>
+
+<footer>
+  <div class="wrap">Facebook Pipeline · Internship Report · <a href="https://github.com/luvyarana/facebook-pipeline">Repository ↗</a></div>
+</footer>
+
+</body>
+</html>
